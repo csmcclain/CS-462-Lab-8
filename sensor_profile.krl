@@ -79,9 +79,6 @@ ruleset sensor_profile {
             raise wrangler event "pending_subscription_approval"
                 attributes event:attrs
             ent:subscriptionTx := event:attr("Tx")
-        } else {
-            raise wrangler event "inbound_rejection"
-                attributes event:attrs
         }
     }
 

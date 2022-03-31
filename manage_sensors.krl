@@ -215,8 +215,6 @@ ruleset manage_sensors {
         }
     }
 
-    // Start for Lab 2
-
     rule identify_child_wellknown {
         select when sensor identify
 
@@ -266,9 +264,6 @@ ruleset manage_sensors {
         if my_role=="Manager" && their_role=="Manager w/o picos" then noop()
         fired {
             raise wrangler event "pending_subscription_approval"
-                attributes event:attrs
-        } else {
-            raise wrangler event "inbound_rejection"
                 attributes event:attrs
         }
     }
