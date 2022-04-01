@@ -1,0 +1,40 @@
+1. This lab uses a vector clock (Links to an external site.) algorithm to create
+    unique message IDs based on a sequence number. Could we replace the sequence 
+    number with a timestamp? What are the advantages and disadvantages of such 
+    an approach?
+    We could totally do that. It would just be a matter of swapping what's appended
+    to the end of the message id. The advantage could be that each message is not as
+    predictable and easy to spoof. This is because they're unique. The disadvantage is
+    it would take more work to determine what was missing from a neighbor in sending all
+    the messages at once.
+
+2. Are the temperature messages in order? Why or why not? If not, what could you do to fix this?
+    Mine messages are in order. I suspect it's by accident but I won't complain. I think it's
+    just the fact that I've sent the missing ones for a specific messageID all at once instead of
+    and individual per each messageID.
+
+3. How did you avoid looping? Why was the unique ID helpful?
+    Unique ID's helped me keep track of what had and had not been sent. Once a pico received the rumor,
+    then it knew who sent it and didn't need to loop that back to the sender.
+
+4. The propagation algorithm sleeps for n seconds between each iteration. What are the trade-offs between
+    a low and high value for n.
+    I would say a lower value of n could slow down hardware, but speed up propagation while a higher value 
+    for n would slow down propagation but increase scaleability.
+
+5. Did new messages eventally end on all the nodes that were connected? Where the messages
+    displayed in the same order on each node? Why or why not?
+    Yes they did. The weren't all in the same order because each node received the messages at a 
+    different time.
+
+6. Why does temporarily disconnecting a node from the network not result in permanent gaps in the 
+    messages seen at that node?
+    Because when it comes back online it can recieve information from it's neighboring nodes instead 
+    of failing at one spot and not recovering.
+
+7. Describe, in a paragraph or two, how you could use the basic scheme implemented here to add failure
+detection to the system using a reachiblity table.
+    I think that the reachability table could easily be kept track of by looking at who has sent me 
+    a message recently. If it's been quite some time I can attempt to send them a message and see If
+    they respond. If they do respond, I know they're online. If they don't then we can notify other 
+    nodes and keep on moving till the node comes back online.
