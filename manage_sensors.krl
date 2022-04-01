@@ -140,6 +140,27 @@ ruleset manage_sensors {
             }
         )
     }
+
+    rule initialize_gossip_ruleset {
+        select when wrangler new_child_created
+
+        pre {
+            eci = event:attrs{"eci"}
+        }
+
+        event:send(
+            {
+                "eci": eci,
+                "eid": "install-ruleset",
+                "domain": "wrangler", "type": "install_ruleset_request",
+                "attrs": {
+                    "absoluteURL": meta:rulesetURI,
+                    "rid": "gossip",
+                    "config": {}
+                }
+            }
+        )
+    }
     
     rule initialize_sensor_profile_ruleset {
         select when wrangler new_child_created

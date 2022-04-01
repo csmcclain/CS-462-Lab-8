@@ -3,8 +3,7 @@ ruleset gossip {
     meta {
         use module io.picolabs.wrangler alias wrangler
         use module io.picolabs.subscription alias subs
-        shares get_events, get_temp_logs, get_own_tracker, get_smart_tracker, get_peer_to_send_to, get_peer_to_rx,
-            get_origins_unsent_to_peer, split_string, get_rumor_message, get_message_to_send, get_seen_message
+        shares get_events, get_temp_logs, get_smart_tracker
     }
 
     global {
@@ -15,16 +14,8 @@ ruleset gossip {
             ent:temp_logs
         }
 
-        get_own_tracker = function() {
-            ent:own_tracker
-        }
-
         get_smart_tracker = function() {
             ent:smart_tracker
-        }
-
-        get_peer_to_rx = function() {
-            ent:peer_to_rx
         }
 
         generate_rumor_message = function(read_temperature, read_time) {
@@ -73,18 +64,21 @@ ruleset gossip {
                 // K will be the origin_ID:value_to_compare_to
                 split_string(k) > last_seen_by_peer
             })
+            last_value = split_string(payload.keys()[payload.keys().length() - 1]).klog("LAST VALUE WAS ")
+
 
             return {
                 "message_type": "rumor",
                 "message_payload": payload,
                 "message_origin": origin_to_send,
-                "peer_sent_to": peer
+                "peer_sent_to": peer,
+                "last_value": last_value
             }
         }
 
         get_seen_message = function() {
             return {
-                "message_type": "seen",
+                "message_type": "seen_message",
                 "message_sender": ent:origin_ID,
                 "message_payload": ent:own_tracker
             }
@@ -117,7 +111,9 @@ ruleset gossip {
             ent:temp_logs := {}
 
             ent:smart_tracker := {}
-            ent:peer_to_rx := {}            
+            ent:peer_to_rx := {}   
+            
+            ent:active_gossip := "on"
         }
     }
 
@@ -142,6 +138,18 @@ ruleset gossip {
         }
 
         if (id) then schedule:remove(id)
+    }
+
+    rule toggel_active {
+        select when gossip toggle_beat
+
+        pre {
+            active = ent:active_gossip == "on" => "off" | "on"
+        }
+
+        always {
+            ent:active_gossip := active
+        }
     }
 
     // Peer connection related rules
@@ -239,7 +247,7 @@ ruleset gossip {
     }
 
     rule process_gossip_heartbeat {
-        select when gossip heartbeat
+        select when gossip heartbeat where ent:active_gossip == "on"
 
         pre {
             // Determine which peer to send to
@@ -271,15 +279,17 @@ ruleset gossip {
         select when gossip update_state
 
         pre {
-            peer_sent_to = event:attrs{"peer_sent_to"}
-            payload = event:attrs{"message_payload"}
-            origin_id_sent = event:attrs{"message_origin"}
+            peer_sent_to = event:attrs{"peer"}.klog("Sent to peer ")
+            message_type = event:attrs{"update"}{"message_type"}.klog("sent message of type ")
+            payload = event:attrs{"update"}{"message_payload"}
+            origin_id_sent = event:attrs{"update"}{"message_origin"}
+            num_sent = event:attrs{"update"}{"last_value"}
         }
 
-        if (peer_sent_to != null) then noop()
+        if (message_type == "rumor") then noop()
 
         fired {
-            ent:smart_tracker{[peer_sent_to, origin_id_sent]} := event:attrs{"message_payload"}.length() - 1
+            ent:smart_tracker{[peer_sent_to, origin_id_sent]} := num_sent
         }
     }
 
@@ -287,16 +297,31 @@ ruleset gossip {
         select when gossip rumor 
 
         pre {
-            messages = event:attrs{"message_payload"}
-            origin = event:attrs{"message_origin"}
+            messages = event:attrs{"message_payload"}.klog("Received message ")
+            origin = event:attrs{"message_origin"}.klog("Received Origin ")
+            num_sent = event:attrs{"last_value"}.klog("Received num sent ")
+            logs = ent:temp_logs{origin} == null => {} | ent:temp_logs{origin}
         }
 
         always {
             // Update my logs
-            ent:temp_logs{origin} := ent:temp_logs{origin}.put(messages)
+            ent:temp_logs{origin} := logs.put(messages)
             // Update my seen table
-            ent:own_tracker{origin} := ent:temp_logs{origin}.length() - 1
+            ent:own_tracker{origin} := num_sent
+        }
+    }
+
+    rule process_seen {
+        select when gossip seen_message
+
+        pre {
+            origin_id_sent = event:attrs{"message_sender"}
+            payload = event:attrs{"message_payload"}
         }
 
+        always {
+            // Update the smart_tracker
+            ent:smart_tracker{origin_id_sent} := payload
+        }
     }
 }
